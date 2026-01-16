@@ -51,6 +51,8 @@ public static class DependencyInjection
         services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
 
         // Configure Google Auth Settings
+        var googleSettings = new GoogleAuthSettings();
+        configuration.GetSection(GoogleAuthSettings.SectionName).Bind(googleSettings);
         services.Configure<GoogleAuthSettings>(configuration.GetSection(GoogleAuthSettings.SectionName));
 
         // Add Authentication
@@ -75,6 +77,13 @@ public static class DependencyInjection
                 IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Secret)),
                 ClockSkew = TimeSpan.Zero
             };
+        })
+        .AddGoogle(googleOptions =>
+        {
+            googleOptions.ClientId = googleSettings.ClientId;
+            googleOptions.ClientSecret = googleSettings.ClientSecret;
+            googleOptions.Scope.Add("profile");
+            googleOptions.Scope.Add("email");
         });
 
         // Add Services
