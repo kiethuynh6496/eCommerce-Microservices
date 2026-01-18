@@ -1,6 +1,4 @@
-#See https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
-
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+﻿FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 USER app
 WORKDIR /app
 EXPOSE 8080
@@ -9,8 +7,16 @@ EXPOSE 8081
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
+
+# Copy csproj files và restore dependencies
 COPY ["Product.API/Product.API.csproj", "Product.API/"]
-RUN dotnet restore "./Product.API/./Product.API.csproj"
+COPY ["Product.Application/Product.Application.csproj", "Product.Application/"]
+COPY ["Product.Domain/Product.Domain.csproj", "Product.Domain/"]
+COPY ["Product.Infrastructure/Product.Infrastructure.csproj", "Product.Infrastructure/"]
+
+RUN dotnet restore "./Product.API/Product.API.csproj"
+
+# Copy toàn bộ source code
 COPY . .
 WORKDIR "/src/Product.API"
 RUN dotnet build "./Product.API.csproj" -c $BUILD_CONFIGURATION -o /app/build

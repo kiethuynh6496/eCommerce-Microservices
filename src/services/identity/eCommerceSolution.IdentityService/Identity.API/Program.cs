@@ -6,12 +6,8 @@ using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configure additional configuration sources
+// Configure additional configuration sources for Docker
 builder.Configuration
-    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true)
-    .AddJsonFile("appsettings.Secrets.json", optional: true, reloadOnChange: true)
-    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.Secrets.json", optional: true, reloadOnChange: true)
     .AddEnvironmentVariables();
 
 // Configure Serilog
@@ -37,24 +33,13 @@ builder.Services.AddInfrastructure(builder.Configuration);
 var app = builder.Build();
 
 // Configure the HTTP request pipeline
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment() || app.Environment.EnvironmentName == "Docker")
 {
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "Identity Service API V1");
         c.RoutePrefix = string.Empty; // Set Swagger UI at root
-    });
-}
-
-// Enable Swagger for Docker environment
-if (app.Environment.EnvironmentName == "Docker")
-{
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Identity Service API V1");
-        c.RoutePrefix = string.Empty;
     });
 }
 
@@ -76,32 +61,32 @@ app.MapGet("/health", () => Results.Ok(new
     environment = app.Environment.EnvironmentName
 })).AllowAnonymous();
 
-// Initialize database
+// Initialize database with retry logic for Docker
 using (var scope = app.Services.CreateScope())
 {
-    try
-    {
-        await Identity.Infrastructure.Persistence.DbInitializer.InitializeAsync(scope.ServiceProvider);
-        Log.Information("Database initialized successfully");
-    }
-    catch (Exception ex)
-    {
-        Log.Error(ex, "An error occurred while initializing the database");
+    var maxRetries = app.Environment.EnvironmentName == "Docker" ? 3 : 1;
+    var retryDelay = 5000; // 5 seconds
 
-        // Trong môi trường Docker, retry nếu database chưa sẵn sàng
-        if (app.Environment.EnvironmentName == "Docker")
+    for (int i = 0; i < maxRetries; i++)
+    {
+        try
         {
-            Log.Warning("Retrying database initialization in 5 seconds...");
-            await Task.Delay(5000);
+            await Identity.Infrastructure.Persistence.DbInitializer.InitializeAsync(scope.ServiceProvider);
+            Log.Information("Database initialized successfully");
+            break;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "An error occurred while initializing the database (Attempt {Attempt}/{MaxRetries})", i + 1, maxRetries);
 
-            try
+            if (i < maxRetries - 1)
             {
-                await Identity.Infrastructure.Persistence.DbInitializer.InitializeAsync(scope.ServiceProvider);
-                Log.Information("Database initialized successfully on retry");
+                Log.Warning("Retrying database initialization in {Delay} seconds...", retryDelay / 1000);
+                await Task.Delay(retryDelay);
             }
-            catch (Exception retryEx)
+            else
             {
-                Log.Error(retryEx, "Database initialization failed after retry");
+                Log.Error("Database initialization failed after all retries");
             }
         }
     }
