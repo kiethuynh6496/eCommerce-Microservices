@@ -1,5 +1,4 @@
-#See https://aka.ms/customizecontainer to learn how to customize your debug container and how Visual Studio uses this Dockerfile to build your images for faster debugging.
-
+﻿# Identity.API/Dockerfile
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 USER app
 WORKDIR /app
@@ -9,8 +8,16 @@ EXPOSE 8081
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
+
+# Copy csproj files và restore dependencies
 COPY ["Identity.API/Identity.API.csproj", "Identity.API/"]
-RUN dotnet restore "./Identity.API/./Identity.API.csproj"
+COPY ["Identity.Application/Identity.Application.csproj", "Identity.Application/"]
+COPY ["Identity.Domain/Identity.Domain.csproj", "Identity.Domain/"]
+COPY ["Identity.Infrastructure/Identity.Infrastructure.csproj", "Identity.Infrastructure/"]
+
+RUN dotnet restore "./Identity.API/Identity.API.csproj"
+
+# Copy toàn bộ source code
 COPY . .
 WORKDIR "/src/Identity.API"
 RUN dotnet build "./Identity.API.csproj" -c $BUILD_CONFIGURATION -o /app/build
