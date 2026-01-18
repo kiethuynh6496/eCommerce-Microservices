@@ -9,6 +9,10 @@ using Order.Domain.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Configure additional configuration sources for Docker
+builder.Configuration
+    .AddEnvironmentVariables();
+
 // Add services to the container
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
@@ -47,7 +51,7 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 // Configure the HTTP request pipeline
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment() || app.Environment.EnvironmentName == "Docker")
 {
     app.UseSwagger();
     app.UseSwaggerUI();
@@ -57,5 +61,50 @@ app.UseHttpsRedirection();
 app.UseCors("AllowAll");
 app.UseAuthorization();
 app.MapControllers();
+
+// Health check endpoint for Docker
+app.MapGet("/health", () => Results.Ok(new
+{
+    status = "healthy",
+    service = "order",
+    timestamp = DateTime.UtcNow,
+    environment = app.Environment.EnvironmentName
+}));
+
+// Initialize MongoDB connection with retry logic for Docker
+using (var scope = app.Services.CreateScope())
+{
+    var maxRetries = app.Environment.EnvironmentName == "Docker" ? 3 : 1;
+    var retryDelay = 5000; // 5 seconds
+
+    for (int i = 0; i < maxRetries; i++)
+    {
+        try
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<OrderDbContext>();
+            // Test MongoDB connection by getting database
+            var database = dbContext.Database;
+            await database.CanConnectAsync();
+
+            Console.WriteLine("MongoDB connection successful");
+            break;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"MongoDB connection attempt {i + 1}/{maxRetries} failed: {ex.Message}");
+
+            if (i < maxRetries - 1)
+            {
+                Console.WriteLine($"Retrying MongoDB connection in {retryDelay / 1000} seconds...");
+                await Task.Delay(retryDelay);
+            }
+            else
+            {
+                Console.WriteLine("MongoDB connection failed after all retries");
+                // Don't throw - let the app start and retry on requests
+            }
+        }
+    }
+}
 
 app.Run();
