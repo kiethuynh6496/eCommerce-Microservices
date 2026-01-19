@@ -1,5 +1,6 @@
 ﻿using FluentValidation;
 using Product.Application.DTOs;
+using Product.Application.Interfaces;
 using Product.Domain.Repositories;
 
 namespace Product.Application.Services
@@ -9,31 +10,75 @@ namespace Product.Application.Services
         private readonly IProductRepository _productRepository;
         private readonly IValidator<CreateProductDto> _createValidator;
         private readonly IValidator<UpdateProductDto> _updateValidator;
+        private readonly ICacheService _cacheService;
+
+        // Cache key patterns
+        private const string CACHE_KEY_SINGLE = "product:{0}";
+        private const string CACHE_KEY_ALL = "product:all";
+
+        // Cache TTL
+        private readonly TimeSpan _cacheDuration = TimeSpan.FromMinutes(5);
 
         public ProductService(
             IProductRepository productRepository,
             IValidator<CreateProductDto> createValidator,
-            IValidator<UpdateProductDto> updateValidator)
+            IValidator<UpdateProductDto> updateValidator,
+            ICacheService cacheService)
         {
             _productRepository = productRepository;
             _createValidator = createValidator;
             _updateValidator = updateValidator;
+            _cacheService = cacheService;
         }
 
         public async Task<ProductDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
         {
+            var cacheKey = string.Format(CACHE_KEY_SINGLE, id);
+
+            // Try to get from cache first
+            var cachedProduct = await _cacheService.GetAsync<ProductDto>(cacheKey);
+            if (cachedProduct != null)
+            {
+                return cachedProduct;
+            }
+
+            // Cache miss - get from database
             var product = await _productRepository.GetByIdAsync(id, cancellationToken);
-            return product == null ? null : MapToDto(product);
+            if (product == null)
+            {
+                return null;
+            }
+
+            var productDto = MapToDto(product);
+
+            // Store in cache
+            await _cacheService.SetAsync(cacheKey, productDto, _cacheDuration);
+
+            return productDto;
         }
 
         public async Task<List<ProductDto>> GetAllAsync(CancellationToken cancellationToken = default)
         {
+            // Try to get from cache
+            var cachedProducts = await _cacheService.GetAsync<List<ProductDto>>(CACHE_KEY_ALL);
+            if (cachedProducts != null)
+            {
+                return cachedProducts;
+            }
+
+            // Cache miss - get from database
             var products = await _productRepository.GetAllAsync(cancellationToken);
-            return products.Select(MapToDto).ToList();
+            var productDtos = products.Select(MapToDto).ToList();
+
+            // Store in cache
+            await _cacheService.SetAsync(CACHE_KEY_ALL, productDtos, _cacheDuration);
+
+            return productDtos;
         }
 
         public async Task<ProductDto> CreateAsync(CreateProductDto dto, CancellationToken cancellationToken = default)
         {
+            // Validate input
             var validationResult = await _createValidator.ValidateAsync(dto, cancellationToken);
             if (!validationResult.IsValid)
             {
@@ -56,11 +101,16 @@ namespace Product.Application.Services
             };
 
             var created = await _productRepository.AddAsync(product, cancellationToken);
+
+            // Invalidate "all products" cache
+            await _cacheService.RemoveAsync(CACHE_KEY_ALL);
+
             return MapToDto(created);
         }
 
         public async Task<ProductDto> UpdateAsync(Guid id, UpdateProductDto dto, CancellationToken cancellationToken = default)
         {
+            // Validate input
             var validationResult = await _updateValidator.ValidateAsync(dto, cancellationToken);
             if (!validationResult.IsValid)
             {
@@ -74,6 +124,7 @@ namespace Product.Application.Services
                 throw new KeyNotFoundException($"Không tìm thấy sản phẩm với ID: {id}");
             }
 
+            // Update properties
             product.Name = dto.Name;
             product.Description = dto.Description;
             product.Price = dto.Price;
@@ -84,6 +135,12 @@ namespace Product.Application.Services
             product.UpdatedAt = DateTime.UtcNow;
 
             await _productRepository.UpdateAsync(product, cancellationToken);
+
+            // Invalidate caches
+            var cacheKey = string.Format(CACHE_KEY_SINGLE, id);
+            await _cacheService.RemoveAsync(cacheKey);
+            await _cacheService.RemoveAsync(CACHE_KEY_ALL);
+
             return MapToDto(product);
         }
 

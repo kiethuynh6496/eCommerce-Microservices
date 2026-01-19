@@ -1,6 +1,7 @@
 ﻿using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using Product.Application.DTOs;
+using Product.Application.Interfaces;
 using Product.Application.Services;
 using Product.Application.Validators;
 

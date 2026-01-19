@@ -1,7 +1,7 @@
 ﻿using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using Product.Application.DTOs;
-using Product.Application.Services;
+using Product.Application.Interfaces;
 
 namespace Product.API.Endpoints
 {

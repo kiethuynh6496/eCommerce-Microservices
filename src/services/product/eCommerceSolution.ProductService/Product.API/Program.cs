@@ -1,5 +1,6 @@
 using Product.API.Endpoints;
 using Product.Application;
+using Product.Application.Interfaces;
 using Product.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -32,6 +33,20 @@ builder.Services.AddCors(options =>
     });
 });
 
+// ============================================
+// REDIS CACHE CONFIGURATION
+// ============================================
+var redisConfiguration = builder.Configuration["Redis:Configuration"] ?? "localhost:6379";
+var redisInstanceName = builder.Configuration["Redis:InstanceName"] ?? "ProductService:";
+
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = redisConfiguration;
+    options.InstanceName = redisInstanceName;
+});
+
+Console.WriteLine($"Redis configured: {redisConfiguration} with instance: {redisInstanceName}");
+
 // Add Application and Infrastructure layers
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -48,14 +63,38 @@ if (app.Environment.IsDevelopment() || app.Environment.EnvironmentName == "Docke
 app.UseHttpsRedirection();
 app.UseCors();
 
-// Health check endpoint for Docker
-app.MapGet("/health", () => Results.Ok(new
+// Enhanced health check endpoint with Redis status
+app.MapGet("/health", async (ICacheService cacheService) =>
 {
-    status = "healthy",
-    service = "product",
-    timestamp = DateTime.UtcNow,
-    environment = app.Environment.EnvironmentName
-}));
+    var healthStatus = new
+    {
+        status = "healthy",
+        service = "product",
+        timestamp = DateTime.UtcNow,
+        environment = app.Environment.EnvironmentName,
+        redis = "unknown"
+    };
+
+    try
+    {
+        // Test Redis connection
+        var testKey = "health-check";
+        var testValue = new { test = "ok", timestamp = DateTime.UtcNow };
+
+        await cacheService.SetAsync(testKey, testValue, TimeSpan.FromSeconds(10));
+        var result = await cacheService.GetAsync<object>(testKey);
+        await cacheService.RemoveAsync(testKey);
+
+        healthStatus = healthStatus with { redis = result != null ? "connected" : "disconnected" };
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Redis health check failed: {ex.Message}");
+        healthStatus = healthStatus with { redis = "disconnected" };
+    }
+
+    return Results.Ok(healthStatus);
+});
 
 app.MapProductEndpoints();
 
@@ -93,6 +132,20 @@ using (var scope = app.Services.CreateScope())
                 // Don't throw in production, let the app start and retry on requests
             }
         }
+    }
+
+    // Test Redis connection on startup
+    try
+    {
+        var cacheService = serviceProvider.GetRequiredService<ICacheService>();
+        await cacheService.SetAsync("startup-test", new { initialized = true }, TimeSpan.FromSeconds(5));
+        await cacheService.RemoveAsync("startup-test");
+        Console.WriteLine("Redis connection verified successfully");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Redis connection verification failed: {ex.Message}");
+        Console.WriteLine("Application will start but caching will be unavailable");
     }
 }
 
