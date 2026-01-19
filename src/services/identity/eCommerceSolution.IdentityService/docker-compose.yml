@@ -1,0 +1,140 @@
+﻿version: '3.8'
+
+services:
+  # ============================================
+  # DATABASES
+  # ============================================
+  
+  postgres:
+    image: postgres:15-alpine
+    container_name: ecommerce-postgres
+    environment:
+      POSTGRES_DB: IdentityDb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ecommerce-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mysql:
+    image: mysql:8.0
+    container_name: ecommerce-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: mysql123
+      MYSQL_DATABASE: ProductDb
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - ecommerce-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-pmysql123"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: --default-authentication-plugin=mysql_native_password
+
+  mongodb:
+    image: mongo:6.0
+    container_name: ecommerce-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: mongo123
+      MONGO_INITDB_DATABASE: OrderDb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - ecommerce-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # MICROSERVICES
+  # ============================================
+
+  identity-service:
+    build:
+      context: ../
+      dockerfile: Identity.API/Dockerfile
+    container_name: identity-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=IdentityDb;Username=postgres;Password=postgres123
+    ports:
+      - "5001:80"
+    networks:
+      - ecommerce-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: on-failure
+
+  product-service:
+    build:
+      context: ../../../product/eCommerceSolution.ProductService
+      dockerfile: Product.API/Dockerfile
+    container_name: product-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__DefaultConnection=Server=mysql;Port=3306;Database=ProductDb;User=root;Password=mysql123;
+    ports:
+      - "5002:80"
+    networks:
+      - ecommerce-network
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: on-failure
+
+  order-service:
+    build:
+      context: ../../order/eCommerceSolution.OrderService
+      dockerfile: Order.API/Dockerfile
+    container_name: order-service
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__MongoDB=mongodb://admin:mongo123@mongodb:27017/OrderDb?authSource=admin
+    ports:
+      - "5003:80"
+    networks:
+      - ecommerce-network
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    restart: on-failure
+
+# ============================================
+# VOLUMES
+# ============================================
+volumes:
+  postgres_data:
+    driver: local
+  mysql_data:
+    driver: local
+  mongo_data:
+    driver: local
+
+# ============================================
+# NETWORKS
+# ============================================
+networks:
+  ecommerce-network:
+    driver: bridge
+    name: ecommerce-network
