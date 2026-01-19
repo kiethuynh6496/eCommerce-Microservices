@@ -1,7 +1,7 @@
 ﻿using FluentValidation;
 using Order.Application.DTOs;
 
-namespace OrderService.Application.Validators;
+namespace Order.Application.Validators;
 
 public class UpdateOrderDtoValidator : AbstractValidator<UpdateOrderDto>
 {

@@ -2,7 +2,7 @@
 using MongoDB.EntityFrameworkCore.Extensions;
 using Order.Domain.Entities;
 
-namespace OrderService.Infrastructure.Data;
+namespace Order.Infrastructure.Data;
 
 public class OrderDbContext : DbContext
 {

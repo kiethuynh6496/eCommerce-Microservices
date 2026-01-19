@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using FluentValidation;
 using Order.Application.DTOs;
-using OrderService.Application.Services;
+using Order.Application.Services;
 
-namespace OrderService.API.Controllers;
+namespace Order.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]

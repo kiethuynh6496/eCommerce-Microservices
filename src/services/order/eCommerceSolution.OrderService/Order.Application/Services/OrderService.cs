@@ -1,20 +1,25 @@
 ﻿using Order.Application.DTOs;
+using Order.Application.DTOs.External;
+using Order.Application.Interfaces.External;
 using Order.Domain.Entities;
 using Order.Domain.Repositories;
 
-namespace OrderService.Application.Services;
+namespace Order.Application.Services;
 
 public class OrderAppService : IOrderService
 {
     private readonly IOrderRepository _orderRepository;
     private readonly IOrderItemRepository _orderItemRepository;
+    private readonly IProductServiceClient _productServiceClient;
 
     public OrderAppService(
         IOrderRepository orderRepository,
-        IOrderItemRepository orderItemRepository)
+        IOrderItemRepository orderItemRepository,
+        IProductServiceClient productServiceClient)
     {
         _orderRepository = orderRepository;
         _orderItemRepository = orderItemRepository;
+        _productServiceClient = productServiceClient;
     }
 
     public async Task<OrderDto?> GetOrderByIdAsync(string id)
@@ -33,6 +38,60 @@ public class OrderAppService : IOrderService
 
     public async Task<OrderDto> CreateOrderAsync(CreateOrderDto createOrderDto)
     {
+        // ================================================
+        // STEP 1: Validate Input
+        // ================================================
+        if (!createOrderDto.OrderItems.Any())
+        {
+            throw new ArgumentException("Order must contain at least one item");
+        }
+
+        // ================================================
+        // STEP 2: Get Product IDs and call Product Service
+        // ================================================
+        var productIds = createOrderDto.OrderItems
+            .Select(x => x.ProductId)
+            .Distinct()
+            .ToList();
+
+        // Get products from Product Service
+        var products = await _productServiceClient.GetProductsByIdsAsync(productIds);
+
+        // ================================================
+        // STEP 3: Validate all products exist
+        // ================================================
+        if (products.Count != productIds.Count)
+        {
+            var foundIds = products.Select(p => p.Id).ToList();
+            var missingIds = productIds.Except(foundIds).ToList();
+
+            throw new Exception($"Products not found: {string.Join(", ", missingIds)}");
+        }
+
+        // ================================================
+        // STEP 4: Check stock availability
+        // ================================================
+        var stockCheckRequests = createOrderDto.OrderItems.Select(item => new StockCheckRequest
+        {
+            ProductId = item.ProductId,
+            Quantity = item.Quantity
+        }).ToList();
+
+        var stockResults = await _productServiceClient.CheckStockAsync(stockCheckRequests);
+
+        var unavailableItems = stockResults.Where(r => !r.IsAvailable).ToList();
+        if (unavailableItems.Any())
+        {
+            var errorMessages = unavailableItems.Select(item =>
+                $"{item.ProductName}: requested {item.RequestedQuantity}, available {item.AvailableStock}"
+            );
+
+            throw new Exception($"Insufficient stock: {string.Join("; ", errorMessages)}");
+        }
+
+        // ================================================
+        // STEP 5: Create Order Entity
+        // ================================================
         var order = new Order.Domain.Entities.Order
         {
             UserId = createOrderDto.UserId,
@@ -44,22 +103,25 @@ public class OrderAppService : IOrderService
             Status = OrderStatus.Pending
         };
 
-        // Calculate total amount and create order items
+        // Calculate total amount and create order items with Product Service data
         decimal totalAmount = 0;
         var orderItems = new List<OrderItem>();
 
         foreach (var itemDto in createOrderDto.OrderItems)
         {
-            var totalPrice = itemDto.Quantity * itemDto.UnitPrice;
+            // Get product info from Product Service response
+            var product = products.First(p => p.Id == itemDto.ProductId);
+
+            var totalPrice = itemDto.Quantity * product.Price;
             totalAmount += totalPrice;
 
             var orderItem = new OrderItem
             {
                 OrderId = order.Id,
                 ProductId = itemDto.ProductId,
-                ProductName = itemDto.ProductName,
+                ProductName = product.Name,        // From Product Service
                 Quantity = itemDto.Quantity,
-                UnitPrice = itemDto.UnitPrice,
+                UnitPrice = product.Price,         // From Product Service
                 TotalPrice = totalPrice
             };
 
@@ -68,6 +130,10 @@ public class OrderAppService : IOrderService
 
         order.TotalAmount = totalAmount;
         order.OrderItems = orderItems;
+
+        // ================================================
+        // STEP 6: Save to database
+        // ================================================
 
         var createdOrder = await _orderRepository.CreateAsync(order);
 
