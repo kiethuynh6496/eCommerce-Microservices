@@ -68,7 +68,7 @@ services:
 
   identity-service:
     build:
-      context: ../
+      context: .
       dockerfile: Identity.API/Dockerfile
     container_name: identity-service
     environment:
