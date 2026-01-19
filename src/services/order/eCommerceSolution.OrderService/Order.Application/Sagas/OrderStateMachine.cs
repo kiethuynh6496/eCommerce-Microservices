@@ -21,10 +21,7 @@ public class OrderStateMachine : MassTransitStateMachine<OrderState>
                     context.Saga.OrderId = context.Message.OrderId;
                     context.Saga.ProductId = context.Message.ProductId;
                     context.Saga.Quantity = context.Message.Quantity;
-                    context.Saga.Price = context.Message.Price;
-                    context.Saga.CustomerId = context.Message.CustomerId;
                     context.Saga.CreatedAt = context.Message.CreatedAt;
-                    context.Saga.InventoryReserved = false;
                 })
                 .Send(context => new Uri("queue:reserve-inventory"),
                     context => new ReserveInventoryCommand
@@ -40,12 +37,10 @@ public class OrderStateMachine : MassTransitStateMachine<OrderState>
             When(InventoryReserved)
                 .Then(context =>
                 {
-                    context.Saga.InventoryReserved = true;
                     context.Saga.CompletedAt = DateTime.UtcNow;
                 })
                 .Publish(context => new OrderCompletedEvent
                 {
-                    OrderId = context.Saga.OrderId,
                     CompletedAt = DateTime.UtcNow
                 })
                 .Finalize()
@@ -56,11 +51,9 @@ public class OrderStateMachine : MassTransitStateMachine<OrderState>
                 .Then(context =>
                 {
                     context.Saga.ErrorMessage = context.Message.Reason;
-                    context.Saga.FailedAt = DateTime.UtcNow;
                 })
                 .Publish(context => new OrderFailedEvent
                 {
-                    OrderId = context.Saga.OrderId,
                     Reason = context.Message.Reason,
                     FailedAt = DateTime.UtcNow
                 })

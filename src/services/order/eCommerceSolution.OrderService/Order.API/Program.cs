@@ -12,7 +12,6 @@ using Polly;
 using Polly.Extensions.Http;
 using MassTransit;
 using Order.Application.Sagas;
-using MassTransit.EntityFrameworkCoreIntegration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -87,7 +86,7 @@ builder.Services.AddHttpClient<IProductServiceClient, ProductServiceClient>(clie
 .AddPolicyHandler(Policy.TimeoutAsync<HttpResponseMessage>(TimeSpan.FromSeconds(10)));
 
 // ============================================
-// MassTransit Configuration with Saga
+// MassTransit Configuration with Saga + Outbox
 // ============================================
 builder.Services.AddMassTransit(x =>
 {
@@ -98,6 +97,28 @@ builder.Services.AddMassTransit(x =>
             r.ExistingDbContext<SagaDbContext>();
             r.UseMySql();
         });
+
+    // Add Consumers (nếu có)
+    // x.AddConsumer<YourConsumer>();
+
+    // ============================================
+    // OUTBOX PATTERN - Ensures exactly-once delivery
+    // ============================================
+    x.AddEntityFrameworkOutbox<SagaDbContext>(o =>
+    {
+        o.UseMySql();
+
+        // Use the same DbContext as Saga for transactional consistency
+        o.UseBusOutbox();
+
+        // Outbox delivery configuration
+        o.QueryDelay = TimeSpan.FromSeconds(1);
+        o.QueryMessageLimit = 100;
+        o.QueryTimeout = TimeSpan.FromSeconds(30);
+
+        // Message retention (cleanup after 7 days)
+        o.DuplicateDetectionWindow = TimeSpan.FromDays(7);
+    });
 
     // Configure RabbitMQ
     x.UsingRabbitMq((context, cfg) =>
@@ -113,17 +134,24 @@ builder.Services.AddMassTransit(x =>
             h.Password(rabbitMqPass);
         });
 
-        // Message Retry Configuration
+        // Global Message Retry Configuration
         cfg.UseMessageRetry(retry =>
         {
             retry.Incremental(3, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2));
         });
 
-        // Configure Saga Endpoint
+        // ============================================
+        // Saga Endpoint Configuration
+        // ============================================
         cfg.ReceiveEndpoint("order-saga-queue", e =>
         {
+            // Retry policy for this endpoint
             e.UseMessageRetry(r => r.Intervals(100, 500, 1000, 2000, 5000));
 
+            // Use InMemory Outbox for message publishing
+            e.UseInMemoryOutbox();
+
+            // Configure saga
             e.ConfigureSaga<OrderState>(context);
         });
 
@@ -171,6 +199,34 @@ app.MapGet("/health", () => Results.Ok(new
     timestamp = DateTime.UtcNow,
     environment = app.Environment.EnvironmentName
 }));
+
+// ============================================
+// Saga State Monitoring Endpoint (Dev only)
+// ============================================
+if (app.Environment.IsDevelopment())
+{
+    app.MapGet("/saga/states", async (SagaDbContext db) =>
+    {
+        var states = await db.OrderStates
+            .OrderByDescending(s => s.CreatedAt)
+            .Take(50)
+            .Select(s => new
+            {
+                s.CorrelationId,
+                s.OrderId,
+                s.CurrentState,
+                s.ProductId,
+                s.Quantity,
+                s.CreatedAt,
+                s.CompletedAt,
+                s.ErrorMessage,
+                s.RetryCount
+            })
+            .ToListAsync();
+
+        return Results.Ok(states);
+    });
+}
 
 // ============================================
 // Database Initialization
@@ -247,7 +303,7 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-Console.WriteLine("=== Order Service Started ===");
+Console.WriteLine("=== Order Service with Saga Started ===");
 app.Run();
 
 // ============================================

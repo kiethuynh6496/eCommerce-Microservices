@@ -1,8 +1,10 @@
-﻿using Order.Application.DTOs;
+﻿using MassTransit;
+using Order.Application.DTOs;
 using Order.Application.DTOs.External;
 using Order.Application.Interfaces.External;
 using Order.Domain.Entities;
 using Order.Domain.Repositories;
+using Ecommerce.Contracts.Events;
 
 namespace Order.Application.Services;
 
@@ -11,15 +13,18 @@ public class OrderAppService : IOrderService
     private readonly IOrderRepository _orderRepository;
     private readonly IOrderItemRepository _orderItemRepository;
     private readonly IProductServiceClient _productServiceClient;
+    private readonly IPublishEndpoint _publishEndpoint;
 
     public OrderAppService(
         IOrderRepository orderRepository,
         IOrderItemRepository orderItemRepository,
-        IProductServiceClient productServiceClient)
+        IProductServiceClient productServiceClient,
+        IPublishEndpoint publishEndpoint)
     {
         _orderRepository = orderRepository;
         _orderItemRepository = orderItemRepository;
         _productServiceClient = productServiceClient;
+        _publishEndpoint = publishEndpoint;
     }
 
     public async Task<OrderDto?> GetOrderByIdAsync(string id)
@@ -69,7 +74,7 @@ public class OrderAppService : IOrderService
         }
 
         // ================================================
-        // STEP 4: Check stock availability
+        // STEP 4: Check stock availability (Initial Check)
         // ================================================
         var stockCheckRequests = createOrderDto.OrderItems.Select(item => new StockCheckRequest
         {
@@ -90,7 +95,7 @@ public class OrderAppService : IOrderService
         }
 
         // ================================================
-        // STEP 5: Create Order Entity
+        // STEP 5: Create Order Entity (Status = Pending)
         // ================================================
         var order = new Order.Domain.Entities.Order
         {
@@ -100,7 +105,7 @@ public class OrderAppService : IOrderService
             ShippingAddress = createOrderDto.ShippingAddress,
             PhoneNumber = createOrderDto.PhoneNumber,
             Notes = createOrderDto.Notes,
-            Status = OrderStatus.Pending
+            Status = OrderStatus.Pending // Waiting for Saga to reserve inventory
         };
 
         // Calculate total amount and create order items with Product Service data
@@ -132,9 +137,8 @@ public class OrderAppService : IOrderService
         order.OrderItems = orderItems;
 
         // ================================================
-        // STEP 6: Save to database
+        // STEP 6: Save to MongoDB
         // ================================================
-
         var createdOrder = await _orderRepository.CreateAsync(order);
 
         // Create order items
@@ -142,6 +146,28 @@ public class OrderAppService : IOrderService
         {
             await _orderItemRepository.CreateAsync(item);
         }
+
+        // ================================================
+        // STEP 7: SAGA INTEGRATION - Publish OrderCreatedEvent
+        // ================================================
+        // NOTE: Chỉ publish event cho single-product orders để đơn giản hóa Phase 4
+        // Multi-product orders sẽ được handle trong Phase nâng cao
+        var firstItem = orderItems.First();
+
+        await _publishEndpoint.Publish<OrderCreatedEvent>(new
+        {
+            CorrelationId = Guid.NewGuid(), // Saga correlation ID
+            OrderId = Guid.Parse(createdOrder.Id),
+            ProductId = firstItem.ProductId,
+            Quantity = firstItem.Quantity,
+            CustomerId = createdOrder.UserId,
+            TotalAmount = createdOrder.TotalAmount,
+            CreatedAt = createdOrder.CreatedAt
+        });
+
+        Console.WriteLine($"[OrderService] ✓ Order {createdOrder.Id} created with status: {createdOrder.Status}");
+        Console.WriteLine($"[OrderService] ✓ Published OrderCreatedEvent - CorrelationId: {createdOrder.Id}");
+        Console.WriteLine($"[OrderService] → Saga will now reserve inventory for ProductId: {firstItem.ProductId}");
 
         return MapToDto(createdOrder);
     }
@@ -170,6 +196,7 @@ public class OrderAppService : IOrderService
         var order = await _orderRepository.GetByIdAsync(id);
         if (order == null) return false;
 
+        var oldStatus = order.Status;
         order.Status = updateStatusDto.Status;
         order.UpdatedAt = DateTime.UtcNow;
 
@@ -182,7 +209,14 @@ public class OrderAppService : IOrderService
             order.CancelledAt = DateTime.UtcNow;
         }
 
-        return await _orderRepository.UpdateAsync(order);
+        var result = await _orderRepository.UpdateAsync(order);
+
+        if (result)
+        {
+            Console.WriteLine($"[OrderService] ✓ Order {id} status changed: {oldStatus} → {order.Status}");
+        }
+
+        return result;
     }
 
     public async Task<bool> DeleteOrderAsync(string id)

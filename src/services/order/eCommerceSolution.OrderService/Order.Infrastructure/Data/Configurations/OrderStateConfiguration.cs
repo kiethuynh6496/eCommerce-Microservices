@@ -15,7 +15,6 @@ public class OrderStateConfiguration : SagaClassMap<OrderState>
 
         entity.Property(x => x.CurrentState).HasMaxLength(64).IsRequired();
         entity.Property(x => x.ProductId).HasMaxLength(50);
-        entity.Property(x => x.CustomerId).HasMaxLength(50);
         entity.Property(x => x.ErrorMessage).HasMaxLength(500);
 
         entity.HasIndex(x => x.OrderId);
