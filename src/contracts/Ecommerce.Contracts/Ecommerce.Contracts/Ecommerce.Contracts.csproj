@@ -8,8 +8,6 @@
 
   <ItemGroup>
     <Folder Include="States\" />
-    <Folder Include="Events\" />
-    <Folder Include="Commands\" />
   </ItemGroup>
 
 </Project>
