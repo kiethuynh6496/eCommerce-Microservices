@@ -79,6 +79,34 @@ services:
       retries: 5
 
   # ============================================
+  # RabbitMQ
+  # ============================================
+
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: ecommerce-rabbitmq
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "5672:5672"    # AMQP protocol port
+      - "15672:15672"  # Management UI port
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - rabbitmq_log:/var/log/rabbitmq
+    networks:
+      - ecommerce-network
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: on-failure
+
+  # ============================================
   # API GATEWAY
   # ============================================
 
@@ -131,12 +159,23 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
       - ConnectionStrings__DefaultConnection=Server=mysql;Port=3306;Database=ProductDb;User=root;Password=mysql123;
+      - Redis__Configuration=redis:6379
+      - Redis__InstanceName=ProductService
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Port=5672
+      - RabbitMQ__Username=guest
+      - RabbitMQ__Password=guest
+      - RabbitMQ__VirtualHost=/
     ports:
       - "5002:80"
     networks:
       - ecommerce-network
     depends_on:
       mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     restart: on-failure
 
@@ -149,12 +188,20 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:80
       - ConnectionStrings__MongoDB=mongodb://admin:mongo123@mongodb:27017/OrderDb?authSource=admin
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Port=5672
+      - RabbitMQ__Username=guest
+      - RabbitMQ__Password=guest
+      - RabbitMQ__VirtualHost=/
+      - Services__ProductService=http://product-service
     ports:
       - "5003:80"
     networks:
       - ecommerce-network
     depends_on:
       mongodb:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
       gateway:
         condition: service_started
@@ -173,6 +220,10 @@ volumes:
   mongo_data:
     driver: local
   redis_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+  rabbitmq_log:
     driver: local
 
 # ============================================
