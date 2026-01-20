@@ -13,8 +13,8 @@ COPY ["src/services/product/eCommerceSolution.ProductService/Product.Infrastruct
 RUN dotnet restore "Product.API/Product.API.csproj"
 
 # Copy source code
-COPY src/contracts/Ecommerce.Contracts/Ecommerce.Contracts/ contracts/Ecommerce.Contracts/Ecommerce.Contracts/
-COPY src/services/product/eCommerceSolution.ProductService/ .
+COPY ["src/contracts/Ecommerce.Contracts/Ecommerce.Contracts/", "contracts/Ecommerce.Contracts/Ecommerce.Contracts/"]
+COPY ["src/services/product/eCommerceSolution.ProductService/", "."]
 
 # Build
 RUN dotnet build "Product.API/Product.API.csproj" -c Release -o /app/build
