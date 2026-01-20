@@ -94,26 +94,15 @@ jobs:
   # ============================================
   # BUILD GATEWAY
   # ============================================
-  build-gateway:
-    name: Build Gateway
-    runs-on: ubuntu-latest
-    
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+build-gateway:
+  name: Build Gateway
+  runs-on: ubuntu-latest
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
 
-      - name: Restore & Build
-        working-directory: src/services/gateway
-        run: |
-          dotnet restore
-          dotnet build --configuration Release --no-restore
-
-      - name: Build Docker Image
-        run: |
-          docker build -t gateway \
-            -f src/services/gateway/eCommerceSolution.Gateway/Gateway.API/Dockerfile .
+    - name: Build Docker Image
+      run: |
+        docker build -t gateway \
+          -f src/services/gateway/eCommerceSolution.Gateway/Gateway.API/Dockerfile .
