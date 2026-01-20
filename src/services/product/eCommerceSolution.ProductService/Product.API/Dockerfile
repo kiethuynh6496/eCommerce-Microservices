@@ -1,31 +1,32 @@
-﻿FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
-USER app
-WORKDIR /app
-EXPOSE 8080
-EXPOSE 8081
-
+﻿# Stage 1: Build
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
-ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 
-# Copy csproj files và restore dependencies
-COPY ["Product.API/Product.API.csproj", "Product.API/"]
-COPY ["Product.Application/Product.Application.csproj", "Product.Application/"]
-COPY ["Product.Domain/Product.Domain.csproj", "Product.Domain/"]
-COPY ["Product.Infrastructure/Product.Infrastructure.csproj", "Product.Infrastructure/"]
+# Copy csproj files
+COPY ["src/contracts/Ecommerce.Contracts/Ecommerce.Contracts/Ecommerce.Contracts.csproj", "Ecommerce.Contracts/"]
+COPY ["src/services/product/eCommerceSolution.ProductService/Product.API/Product.API.csproj", "Product.API/"]
+COPY ["src/services/product/eCommerceSolution.ProductService/Product.Application/Product.Application.csproj", "Product.Application/"]
+COPY ["src/services/product/eCommerceSolution.ProductService/Product.Domain/Product.Domain.csproj", "Product.Domain/"]
+COPY ["src/services/product/eCommerceSolution.ProductService/Product.Infrastructure/Product.Infrastructure.csproj", "Product.Infrastructure/"]
 
-RUN dotnet restore "./Product.API/Product.API.csproj"
+# Restore
+RUN dotnet restore "Product.API/Product.API.csproj"
 
-# Copy toàn bộ source code
-COPY . .
-WORKDIR "/src/Product.API"
-RUN dotnet build "./Product.API.csproj" -c $BUILD_CONFIGURATION -o /app/build
+# Copy source code
+COPY src/services/product/eCommerceSolution.ProductService/ .
 
+# Build
+RUN dotnet build "Product.API/Product.API.csproj" -c Release -o /app/build
+
+# Publish
 FROM build AS publish
-ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./Product.API.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "Product.API/Product.API.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
-FROM base AS final
+# Stage 2: Runtime
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 WORKDIR /app
+EXPOSE 80
+EXPOSE 443
+
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "Product.API.dll"]

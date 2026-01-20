@@ -1,31 +1,32 @@
-﻿FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
-USER app
-WORKDIR /app
-EXPOSE 8080
-EXPOSE 8081
-
+﻿# Stage 1: Build
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
-ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 
-# Copy csproj files và restore dependencies
-COPY ["Order.API/Order.API.csproj", "Order.API/"]
-COPY ["Order.Application/Order.Application.csproj", "Order.Application/"]
-COPY ["Order.Domain/Order.Domain.csproj", "Order.Domain/"]
-COPY ["Order.Infrastructure/Order.Infrastructure.csproj", "Order.Infrastructure/"]
+# Copy csproj files
+COPY ["src/contracts/Ecommerce.Contracts/Ecommerce.Contracts/Ecommerce.Contracts.csproj", "Ecommerce.Contracts/"]
+COPY ["src/services/order/eCommerceSolution.OrderService/Order.API/Order.API.csproj", "Order.API/"]
+COPY ["src/services/order/eCommerceSolution.OrderService/Order.Application/Order.Application.csproj", "Order.Application/"]
+COPY ["src/services/order/eCommerceSolution.OrderService/Order.Domain/Order.Domain.csproj", "Order.Domain/"]
+COPY ["src/services/order/eCommerceSolution.OrderService/Order.Infrastructure/Order.Infrastructure.csproj", "Order.Infrastructure/"]
 
-RUN dotnet restore "./Order.API/Order.API.csproj"
+# Restore
+RUN dotnet restore "Order.API/Order.API.csproj"
 
-# Copy toàn bộ source code
-COPY . .
-WORKDIR "/src/Order.API"
-RUN dotnet build "./Order.API.csproj" -c $BUILD_CONFIGURATION -o /app/build
+# Copy source code
+COPY src/services/order/eCommerceSolution.OrderService/ .
 
+# Build
+RUN dotnet build "Order.API/Order.API.csproj" -c Release -o /app/build
+
+# Publish
 FROM build AS publish
-ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./Order.API.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "Order.API/Order.API.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
-FROM base AS final
+# Stage 2: Runtime
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 WORKDIR /app
+EXPOSE 80
+EXPOSE 443
+
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "Order.API.dll"]
