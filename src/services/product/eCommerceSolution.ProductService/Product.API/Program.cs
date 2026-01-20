@@ -4,6 +4,7 @@ using Product.Application.Interfaces;
 using Product.Infrastructure;
 using Product.Application.Consumers;
 using MassTransit;
+using Product.Infrastructure.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -86,6 +87,7 @@ builder.Services.AddMassTransit(x =>
             e.PrefetchCount = 16;
             e.ConcurrentMessageLimit = 8;
             e.UseMessageRetry(r => r.Intervals(100, 500, 1000, 2000, 5000));
+            //e.UseEntityFrameworkInbox<ApplicationDbContext>(context);
             e.ConfigureConsumer<ReserveInventoryConsumer>(context);
         });
 
@@ -95,6 +97,7 @@ builder.Services.AddMassTransit(x =>
             e.PrefetchCount = 16;
             e.ConcurrentMessageLimit = 8;
             e.UseMessageRetry(r => r.Intervals(100, 500, 1000, 2000, 5000));
+            // e.UseEntityFrameworkInbox<ApplicationDbContext>(context);
             e.ConfigureConsumer<ReleaseInventoryConsumer>(context);
         });
 
