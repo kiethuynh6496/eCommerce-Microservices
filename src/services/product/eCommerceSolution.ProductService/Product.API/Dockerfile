@@ -1,27 +1,29 @@
 ﻿# Stage 1: Build
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
-WORKDIR /src
+
+# Tạo cấu trúc thư mục giống local: /build/src/...
+WORKDIR /build/src
 
 # Copy csproj files
 COPY ["src/contracts/Ecommerce.Contracts/Ecommerce.Contracts/Ecommerce.Contracts.csproj", "contracts/Ecommerce.Contracts/Ecommerce.Contracts/"]
-COPY ["src/services/product/eCommerceSolution.ProductService/Product.API/Product.API.csproj", "Product.API/"]
-COPY ["src/services/product/eCommerceSolution.ProductService/Product.Application/Product.Application.csproj", "Product.Application/"]
-COPY ["src/services/product/eCommerceSolution.ProductService/Product.Domain/Product.Domain.csproj", "Product.Domain/"]
-COPY ["src/services/product/eCommerceSolution.ProductService/Product.Infrastructure/Product.Infrastructure.csproj", "Product.Infrastructure/"]
+COPY ["src/services/product/eCommerceSolution.ProductService/Product.API/Product.API.csproj", "services/product/eCommerceSolution.ProductService/Product.API/"]
+COPY ["src/services/product/eCommerceSolution.ProductService/Product.Application/Product.Application.csproj", "services/product/eCommerceSolution.ProductService/Product.Application/"]
+COPY ["src/services/product/eCommerceSolution.ProductService/Product.Domain/Product.Domain.csproj", "services/product/eCommerceSolution.ProductService/Product.Domain/"]
+COPY ["src/services/product/eCommerceSolution.ProductService/Product.Infrastructure/Product.Infrastructure.csproj", "services/product/eCommerceSolution.ProductService/Product.Infrastructure/"]
 
 # Restore
-RUN dotnet restore "Product.API/Product.API.csproj"
+RUN dotnet restore "services/product/eCommerceSolution.ProductService/Product.API/Product.API.csproj"
 
 # Copy source code
 COPY ["src/contracts/Ecommerce.Contracts/Ecommerce.Contracts/", "contracts/Ecommerce.Contracts/Ecommerce.Contracts/"]
-COPY ["src/services/product/eCommerceSolution.ProductService/", "."]
+COPY ["src/services/product/eCommerceSolution.ProductService/", "services/product/eCommerceSolution.ProductService/"]
 
 # Build
-RUN dotnet build "Product.API/Product.API.csproj" -c Release -o /app/build
+RUN dotnet build "services/product/eCommerceSolution.ProductService/Product.API/Product.API.csproj" -c Release -o /app/build
 
 # Publish
 FROM build AS publish
-RUN dotnet publish "Product.API/Product.API.csproj" -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "services/product/eCommerceSolution.ProductService/Product.API/Product.API.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
 # Stage 2: Runtime
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
