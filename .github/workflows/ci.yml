@@ -116,4 +116,4 @@ jobs:
       - name: Build Docker Image
         run: |
           docker build -t gateway \
-            -f src/services/gateway/Ocelot.ApiGateway/Dockerfile .
+            -f src/services/gateway/eCommerceSolution.Gateway/Gateway.API/Dockerfile .
