@@ -3,27 +3,25 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
 # Copy csproj files
-COPY ["src/contracts/Ecommerce.Contracts/Ecommerce.Contracts/Ecommerce.Contracts.csproj", "Ecommerce.Contracts/"]
-COPY ["src/services/order/eCommerceSolution.OrderService/Order.API/Order.API.csproj", "Order.API/"]
-COPY ["src/services/order/eCommerceSolution.OrderService/Order.Application/Order.Application.csproj", "Order.Application/"]
-COPY ["src/services/order/eCommerceSolution.OrderService/Order.Domain/Order.Domain.csproj", "Order.Domain/"]
-COPY ["src/services/order/eCommerceSolution.OrderService/Order.Infrastructure/Order.Infrastructure.csproj", "Order.Infrastructure/"]
+COPY ["src/contracts/Ecommerce.Contracts/Ecommerce.Contracts/Ecommerce.Contracts.csproj", "contracts/Ecommerce.Contracts/Ecommerce.Contracts/"]
+COPY ["src/services/order/eCommerceSolution.OrderService/Order.API/Order.API.csproj", "services/order/eCommerceSolution.OrderService/Order.API/"]
+COPY ["src/services/order/eCommerceSolution.OrderService/Order.Application/Order.Application.csproj", "services/order/eCommerceSolution.OrderService/Order.Application/"]
+COPY ["src/services/order/eCommerceSolution.OrderService/Order.Domain/Order.Domain.csproj", "services/order/eCommerceSolution.OrderService/Order.Domain/"]
+COPY ["src/services/order/eCommerceSolution.OrderService/Order.Infrastructure/Order.Infrastructure.csproj", "services/order/eCommerceSolution.OrderService/Order.Infrastructure/"]
 
 # Restore
-RUN dotnet restore "Order.API/Order.API.csproj"
+RUN dotnet restore "services/order/eCommerceSolution.OrderService/Order.API/Order.API.csproj"
 
-# Copy Contracts source code
-COPY src/contracts/Ecommerce.Contracts/Ecommerce.Contracts/ Ecommerce.Contracts/
-
-# Copy source code
-COPY src/services/order/eCommerceSolution.OrderService/ .
+# Copy Contracts and source code
+COPY ["src/contracts/Ecommerce.Contracts/Ecommerce.Contracts/", "contracts/Ecommerce.Contracts/Ecommerce.Contracts/"]
+COPY ["src/services/order/eCommerceSolution.OrderService/", "services/order/eCommerceSolution.OrderService/"]
 
 # Build
-RUN dotnet build "Order.API/Order.API.csproj" -c Release -o /app/build
+RUN dotnet build "services/order/eCommerceSolution.OrderService/Order.API/Order.API.csproj" -c Release -o /app/build
 
 # Publish
 FROM build AS publish
-RUN dotnet publish "Order.API/Order.API.csproj" -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "services/order/eCommerceSolution.OrderService/Order.API/Order.API.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
 # Stage 2: Runtime
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
