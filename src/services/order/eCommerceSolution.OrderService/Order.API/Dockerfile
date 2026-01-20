@@ -12,6 +12,9 @@ COPY ["src/services/order/eCommerceSolution.OrderService/Order.Infrastructure/Or
 # Restore
 RUN dotnet restore "Order.API/Order.API.csproj"
 
+# Copy Contracts source code
+COPY src/contracts/Ecommerce.Contracts/Ecommerce.Contracts/ Ecommerce.Contracts/
+
 # Copy source code
 COPY src/services/order/eCommerceSolution.OrderService/ .
 

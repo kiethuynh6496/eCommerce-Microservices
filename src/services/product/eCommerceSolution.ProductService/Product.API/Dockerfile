@@ -12,6 +12,9 @@ COPY ["src/services/product/eCommerceSolution.ProductService/Product.Infrastruct
 # Restore
 RUN dotnet restore "Product.API/Product.API.csproj"
 
+# Copy Contracts source code
+COPY src/contracts/Ecommerce.Contracts/Ecommerce.Contracts/ Ecommerce.Contracts/
+
 # Copy source code
 COPY src/services/product/eCommerceSolution.ProductService/ .
 

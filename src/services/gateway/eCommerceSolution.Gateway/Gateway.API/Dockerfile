@@ -3,20 +3,20 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
 # Copy csproj file
-COPY ["src/services/gateway/Ocelot.ApiGateway/Ocelot.ApiGateway.csproj", "Ocelot.ApiGateway/"]
+COPY ["src/services/gateway/eCommerceSolution.Gateway/Gateway.API/Gateway.API.csproj", "Gateway.API/"]
 
 # Restore
-RUN dotnet restore "Ocelot.ApiGateway/Ocelot.ApiGateway.csproj"
+RUN dotnet restore "Gateway.API/Gateway.API.csproj"
 
 # Copy source code
 COPY src/services/gateway/Ocelot.ApiGateway/ Ocelot.ApiGateway/
 
 # Build
-RUN dotnet build "Ocelot.ApiGateway/Ocelot.ApiGateway.csproj" -c Release -o /app/build
+RUN dotnet build "Gateway.API/Gateway.API.csproj" -c Release -o /app/build
 
 # Publish
 FROM build AS publish
-RUN dotnet publish "Ocelot.ApiGateway/Ocelot.ApiGateway.csproj" -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "Gateway.API/Gateway.API.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
 # Stage 2: Runtime
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
