@@ -94,15 +94,15 @@ jobs:
   # ============================================
   # BUILD GATEWAY
   # ============================================
-build-gateway:
-  name: Build Gateway
-  runs-on: ubuntu-latest
+  build-gateway:
+    name: Build Gateway
+    runs-on: ubuntu-latest
 
-  steps:
-    - name: Checkout
-      uses: actions/checkout@v4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Build Docker Image
-      run: |
-        docker build -t gateway \
-          -f src/services/gateway/eCommerceSolution.Gateway/Gateway.API/Dockerfile .
+      - name: Build Docker Image
+        run: |
+          docker build -t gateway \
+            -f src/services/gateway/eCommerceSolution.Gateway/Gateway.API/Dockerfile .
