@@ -12,4 +12,9 @@ public class Product
     public bool IsActive { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+
+    /// <summary>
+    /// optimistic concurrency control
+    /// </summary>
+    public byte[]? RowVersion { get; set; }
 }

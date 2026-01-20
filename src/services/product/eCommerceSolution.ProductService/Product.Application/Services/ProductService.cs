@@ -31,7 +31,7 @@ namespace Product.Application.Services
             _cacheService = cacheService;
         }
 
-        public async Task<ProductDto?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+        public async Task<ProductDto?> GetByIdAsync(string id, CancellationToken cancellationToken = default)
         {
             var cacheKey = string.Format(CACHE_KEY_SINGLE, id);
 
@@ -108,7 +108,7 @@ namespace Product.Application.Services
             return MapToDto(created);
         }
 
-        public async Task<ProductDto> UpdateAsync(Guid id, UpdateProductDto dto, CancellationToken cancellationToken = default)
+        public async Task<ProductDto> UpdateAsync(string id, UpdateProductDto dto, CancellationToken cancellationToken = default)
         {
             // Validate input
             var validationResult = await _updateValidator.ValidateAsync(dto, cancellationToken);

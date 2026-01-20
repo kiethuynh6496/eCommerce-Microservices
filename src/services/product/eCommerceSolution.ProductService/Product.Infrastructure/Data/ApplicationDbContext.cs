@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using MassTransit;
+using Microsoft.EntityFrameworkCore;
 
 namespace Product.Infrastructure.Data
 {
@@ -51,7 +52,19 @@ namespace Product.Infrastructure.Data
                 entity.HasIndex(e => e.Category);
                 entity.HasIndex(e => e.IsActive);
                 entity.HasIndex(e => e.Name);
+
+                // Row version for optimistic concurrency control
+                entity.Property(e => e.RowVersion)
+                    .IsRowVersion();
             });
+
+            // ============================================
+            // MassTransit Inbox Tables (Idempotency)
+            // IMPORTANT: These are required for Inbox Pattern
+            // ============================================
+            modelBuilder.AddInboxStateEntity();
+            modelBuilder.AddOutboxMessageEntity();
+            modelBuilder.AddOutboxStateEntity();
         }
     }
 }

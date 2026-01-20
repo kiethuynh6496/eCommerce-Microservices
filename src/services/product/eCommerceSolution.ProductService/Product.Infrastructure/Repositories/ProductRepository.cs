@@ -18,11 +18,11 @@ namespace Product.Infrastructure.Repositories
             _context = context;
         }
 
-        public async Task<Product.Domain.Entities.Product?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
+        public async Task<Product.Domain.Entities.Product?> GetByIdAsync(string id, CancellationToken cancellationToken = default)
         {
             return await _context.Products
                 .AsNoTracking()
-                .FirstOrDefaultAsync(p => p.Id == id, cancellationToken);
+                .FirstOrDefaultAsync(p => p.Id.ToString() == id, cancellationToken);
         }
 
         public async Task<List<Product.Domain.Entities.Product>> GetAllAsync(CancellationToken cancellationToken = default)

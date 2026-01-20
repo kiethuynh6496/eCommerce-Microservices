@@ -47,7 +47,7 @@ namespace Product.API.Endpoints
         }
 
         private static async Task<IResult> GetProductById(
-            Guid id,
+            string id,
             IProductService productService,
             CancellationToken cancellationToken)
         {
@@ -77,7 +77,7 @@ namespace Product.API.Endpoints
         }
 
         private static async Task<IResult> UpdateProduct(
-            Guid id,
+            string id,
             UpdateProductDto dto,
             IProductService productService,
             CancellationToken cancellationToken)
