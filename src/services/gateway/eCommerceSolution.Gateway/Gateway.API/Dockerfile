@@ -9,7 +9,7 @@ COPY ["src/services/gateway/eCommerceSolution.Gateway/Gateway.API/Gateway.API.cs
 RUN dotnet restore "Gateway.API/Gateway.API.csproj"
 
 # Copy source code
-COPY src/services/gateway/Ocelot.ApiGateway/ Ocelot.ApiGateway/
+COPY ["src/services/gateway/eCommerceSolution.Gateway/Gateway.API/", "Gateway.API/"]
 
 # Build
 RUN dotnet build "Gateway.API/Gateway.API.csproj" -c Release -o /app/build
@@ -25,4 +25,4 @@ EXPOSE 80
 EXPOSE 443
 
 COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "Ocelot.ApiGateway.dll"]
+ENTRYPOINT ["dotnet", "Gateway.API.dll"]
