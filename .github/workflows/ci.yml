@@ -1,0 +1,119 @@
+﻿name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  DOTNET_VERSION: '8.0.x'
+
+jobs:
+  # ============================================
+  # BUILD IDENTITY SERVICE
+  # ============================================
+  build-identity:
+    name: Build Identity Service
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore & Build
+        working-directory: src/services/identity/eCommerceSolution.IdentityService
+        run: |
+          dotnet restore
+          dotnet build --configuration Release --no-restore
+
+      - name: Build Docker Image
+        run: |
+          docker build -t identity-service \
+            -f src/services/identity/eCommerceSolution.IdentityService/Identity.API/Dockerfile .
+
+  # ============================================
+  # BUILD PRODUCT SERVICE
+  # ============================================
+  build-product:
+    name: Build Product Service
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore & Build
+        working-directory: src/services/product/eCommerceSolution.ProductService
+        run: |
+          dotnet restore
+          dotnet build --configuration Release --no-restore
+
+      - name: Build Docker Image
+        run: |
+          docker build -t product-service \
+            -f src/services/product/eCommerceSolution.ProductService/Product.API/Dockerfile .
+
+  # ============================================
+  # BUILD ORDER SERVICE
+  # ============================================
+  build-order:
+    name: Build Order Service
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore & Build
+        working-directory: src/services/order/eCommerceSolution.OrderService
+        run: |
+          dotnet restore
+          dotnet build --configuration Release --no-restore
+
+      - name: Build Docker Image
+        run: |
+          docker build -t order-service \
+            -f src/services/order/eCommerceSolution.OrderService/Order.API/Dockerfile .
+
+  # ============================================
+  # BUILD GATEWAY
+  # ============================================
+  build-gateway:
+    name: Build Gateway
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore & Build
+        working-directory: src/services/gateway
+        run: |
+          dotnet restore
+          dotnet build --configuration Release --no-restore
+
+      - name: Build Docker Image
+        run: |
+          docker build -t gateway \
+            -f src/services/gateway/Ocelot.ApiGateway/Dockerfile .
