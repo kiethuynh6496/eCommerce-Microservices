@@ -3,7 +3,7 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
 # Copy csproj files
-COPY ["src/contracts/Ecommerce.Contracts/Ecommerce.Contracts/Ecommerce.Contracts.csproj", "Ecommerce.Contracts/"]
+COPY ["src/contracts/Ecommerce.Contracts/Ecommerce.Contracts/Ecommerce.Contracts.csproj", "contracts/Ecommerce.Contracts/Ecommerce.Contracts/"]
 COPY ["src/services/product/eCommerceSolution.ProductService/Product.API/Product.API.csproj", "Product.API/"]
 COPY ["src/services/product/eCommerceSolution.ProductService/Product.Application/Product.Application.csproj", "Product.Application/"]
 COPY ["src/services/product/eCommerceSolution.ProductService/Product.Domain/Product.Domain.csproj", "Product.Domain/"]
@@ -12,10 +12,8 @@ COPY ["src/services/product/eCommerceSolution.ProductService/Product.Infrastruct
 # Restore
 RUN dotnet restore "Product.API/Product.API.csproj"
 
-# Copy Contracts source code
-COPY src/contracts/Ecommerce.Contracts/Ecommerce.Contracts/ Ecommerce.Contracts/
-
 # Copy source code
+COPY src/contracts/Ecommerce.Contracts/Ecommerce.Contracts/ contracts/Ecommerce.Contracts/Ecommerce.Contracts/
 COPY src/services/product/eCommerceSolution.ProductService/ .
 
 # Build
@@ -30,6 +28,5 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 WORKDIR /app
 EXPOSE 80
 EXPOSE 443
-
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "Product.API.dll"]
